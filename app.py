@@ -63,10 +63,11 @@ def load_model():
             df[col] = df[col].fillna(df[col].mode()[0])
     df.drop_duplicates(inplace=True)
 
-    # Encode categoricals
-    enc = LabelEncoder()
+    # Encode categoricals and keep per-column encoders for inference
+    encoders = {}
     for col in df.select_dtypes(include='object').columns:
-        df[col] = enc.fit_transform(df[col])
+        encoders[col] = LabelEncoder()
+        df[col] = encoders[col].fit_transform(df[col])
 
     X = df.drop('procrastination_score', axis=1)
     y = df['procrastination_score']
@@ -74,10 +75,10 @@ def load_model():
     X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
-    return model, X.columns.tolist()
+    return model, X.columns.tolist(), encoders
 
 
-model, feature_cols = load_model()
+model, feature_cols, encoders = load_model()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ def get_tips(score, inputs):
     tips = []
     if inputs['sleep_hours'] < 7:
         tips.append("💤 Aim for 7–9 hours of sleep to boost focus and reduce procrastination.")
-    if inputs['screen_time'] > 4:
+    if inputs['screen_time_minutes'] > 240:
         tips.append("📵 Reduce screen time. Excessive use drains motivation and self-control.")
     if inputs['stress_level'] > 6:
         tips.append("🧘 High stress is a procrastination trigger. Try mindfulness or exercise.")
@@ -105,7 +106,7 @@ def get_tips(score, inputs):
         tips.append("🎯 Set small, achievable daily goals to rebuild motivation momentum.")
     if inputs['self_control'] < 4:
         tips.append("🛡️ Practice time-blocking: schedule focused work intervals (e.g., Pomodoro).")
-    if inputs['routine_consistency'] < 3:
+    if inputs['routine_consistency'] == "No":
         tips.append("📅 Build a consistent daily routine — consistency reduces decision fatigue.")
     if not tips:
         tips.append("✅ Keep up your great habits! Stay consistent and keep challenging yourself.")
@@ -121,9 +122,10 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 😴 Sleep & Screen")
+    st.markdown("### � Sleep & Screen")
+    age = st.slider("Age", 16, 40, 24)
     sleep_hours = st.slider("Sleep Hours per Night", 3.0, 12.0, 7.0, 0.5)
-    screen_time = st.slider("Daily Screen Time (hours)", 0.0, 12.0, 4.0, 0.5)
+    screen_time_minutes = st.slider("Daily Screen Time (minutes)", 30, 720, 240, 5)
 
     st.markdown("### ✅ Task Management")
     tasks_planned = st.number_input("Tasks Planned Today", 1, 20, 5)
@@ -138,19 +140,20 @@ with col2:
     st.markdown("### 🎯 Behavior & Routine")
     task_interest = st.slider("Task Interest / Engagement (1–10)", 1.0, 10.0, 5.0, 0.5)
     self_control = st.slider("Self-Control (1 = low, 10 = high)", 1.0, 10.0, 5.0, 0.5)
-    routine_consistency = st.slider("Routine Consistency (1 = irregular, 5 = very consistent)", 1, 5, 3)
+    routine_consistency = st.selectbox("Routine Consistency", options=["Yes", "No"])
     peak_productivity_time = st.selectbox(
         "Peak Productivity Time",
-        options=[0, 1, 2],
-        format_func=lambda x: {0: "🌅 Morning", 1: "🌞 Afternoon", 2: "🌙 Evening"}[x]
+        options=["Morning", "Afternoon", "Evening"],
+        format_func=lambda x: {"Morning": "🌅 Morning", "Afternoon": "🌞 Afternoon", "Evening": "🌙 Evening"}[x]
     )
 
 st.divider()
 
 if st.button("🔍 Predict My Procrastination Score", use_container_width=True, type="primary"):
     input_dict = {
+        'age': age,
         'sleep_hours': sleep_hours,
-        'screen_time': screen_time,
+        'screen_time_minutes': screen_time_minutes,
         'tasks_planned': tasks_planned,
         'tasks_completed': tasks_completed,
         'focus_hours': focus_hours,
@@ -163,6 +166,8 @@ if st.button("🔍 Predict My Procrastination Score", use_container_width=True, 
     }
 
     input_df = pd.DataFrame([input_dict])[feature_cols]
+    for col, enc in encoders.items():
+        input_df[col] = enc.transform(input_df[col].astype(str))
     raw_score = model.predict(input_df)[0]
     score = round(float(np.clip(raw_score, 0, 5)), 2)
 

@@ -38,8 +38,9 @@ The app will open in your browser at `http://localhost:8501`
 
 | Feature | Description |
 |---|---|
+| Age | User age (16–40) |
 | Sleep Hours | Hours of sleep per night |
-| Screen Time | Daily screen usage in hours |
+| Screen Time (Minutes) | Daily screen usage in minutes |
 | Tasks Planned | Number of tasks planned for the day |
 | Tasks Completed | Tasks actually finished |
 | Focus Hours | Hours of deep focused work |
@@ -47,7 +48,7 @@ The app will open in your browser at `http://localhost:8501`
 | Motivation Level | Self-rated motivation (1–10) |
 | Task Interest | Engagement with tasks (1–10) |
 | Self Control | Ability to resist distractions (1–10) |
-| Routine Consistency | How consistent your daily routine is (1–5) |
+| Routine Consistency | Whether your routine is consistent (Yes/No) |
 | Peak Productivity Time | Morning / Afternoon / Evening |
 
 ## 📈 Model
